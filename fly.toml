@@ -1,0 +1,31 @@
+# Fly.io — `fly launch --no-deploy`, then set secrets (see docs/DEPLOYMENT.md) and `fly deploy`.
+app = "our-little-world"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  UPLOAD_DIR = "/data/uploads"
+  TRUST_PROXY = "1"
+
+# Persistent disk for private photos/videos/voice notes (STORAGE_DRIVER=local).
+[[mounts]]
+  source = "olw_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Keep one machine running: chats, calls and scheduled surprises need a live process.
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "40s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"

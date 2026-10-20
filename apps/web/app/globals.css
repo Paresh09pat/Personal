@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg: #fdf6f4;
+  --bg-deep: #f8e8e6;
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-solid: #ffffff;
+  --ink: #3b1424;
+  --ink-soft: #6b3f4f;
+  --muted: #9a7280;
+  --line: rgba(122, 41, 66, 0.12);
+  --accent: #c2185b;
+  --accent-ink: #ffffff;
+  --accent-soft: #fde4ec;
+  --bubble-them: #ffffff;
+  --gold: #c9a227;
+  --danger: #b42318;
+  --shadow: 0 10px 40px -12px rgba(122, 23, 63, 0.25);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #160a10;
+    --bg-deep: #1f0e17;
+    --surface: rgba(42, 20, 31, 0.78);
+    --surface-solid: #2a141f;
+    --ink: #fbe9ef;
+    --ink-soft: #e7c1cf;
+    --muted: #b48a99;
+    --line: rgba(251, 233, 239, 0.1);
+    --accent: #f06292;
+    --accent-ink: #2a0b17;
+    --accent-soft: rgba(240, 98, 146, 0.16);
+    --bubble-them: #331a26;
+    --shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Per-space accent (set on the space shell from the space's preferences). */
+[data-accent='wine'] { --accent: #8e2443; --accent-soft: #f7dbe3; }
+[data-accent='lavender'] { --accent: #7c5cbf; --accent-soft: #ece6fa; }
+[data-accent='gold'] { --accent: #b8860b; --accent-soft: #fbf0d4; }
+[data-accent='ocean'] { --accent: #1e6f8f; --accent-soft: #dcf0f7; }
+@media (prefers-color-scheme: dark) {
+  [data-accent='wine'] { --accent: #e57399; --accent-soft: rgba(229, 115, 153, 0.15); }
+  [data-accent='lavender'] { --accent: #b39ddb; --accent-soft: rgba(179, 157, 219, 0.15); }
+  [data-accent='gold'] { --accent: #e0b84c; --accent-soft: rgba(224, 184, 76, 0.15); }
+  [data-accent='ocean'] { --accent: #6ec6e6; --accent-soft: rgba(110, 198, 230, 0.15); }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-deep: var(--bg-deep);
+  --color-surface: var(--surface);
+  --color-surface-solid: var(--surface-solid);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-bubble-them: var(--bubble-them);
+  --color-gold: var(--gold);
+  --color-danger: var(--danger);
+  --font-display: var(--font-cormorant), 'Cormorant Garamond', Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --shadow-soft: var(--shadow);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+body {
+  min-height: 100dvh;
+  background-image:
+    radial-gradient(60rem 40rem at 110% -10%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(50rem 35rem at -20% 110%, color-mix(in oklab, var(--gold) 10%, transparent), transparent 60%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+@keyframes float-heart {
+  0% { transform: translateY(0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-120px) scale(1.1); opacity: 0; }
+}
+.animate-float-heart {
+  animation: float-heart 2.4s ease-out forwards;
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.96) translateY(6px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+.animate-pop-in {
+  animation: pop-in 0.22s ease-out;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 50%, transparent); }
+  100% { box-shadow: 0 0 0 22px transparent; }
+}
+.animate-ring {
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-heart,
+  .animate-pop-in,
+  .animate-ring {
+    animation: none;
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "our-little-world",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private, isolated one-to-one relationship spaces: chat, media, memories, letters, surprises and calls.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @olw/server",
+    "build": "npm run build -w @olw/web",
+    "start": "npm run start -w @olw/server",
+    "start:prod": "cross-env NODE_ENV=production npm run start -w @olw/server",
+    "lint": "eslint .",
+    "test": "npm run test -w @olw/server && npm run test -w @olw/web",
+    "test:isolation": "npm run test:isolation -w @olw/server",
+    "migrate:legacy": "npm run migrate:legacy -w @olw/server --",
+    "create-admin": "npm run create-admin -w @olw/server --",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "cross-env": "10.1.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.2",
+    "globals": "17.13.0",
+    "prettier": "3.9.10"
+  }
+}

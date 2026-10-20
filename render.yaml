@@ -1,0 +1,27 @@
+# Render Blueprint. Note: persistent disks need a paid instance. On the free instance the disk is
+# wiped on every deploy/restart, so use STORAGE_DRIVER=s3 (e.g. Cloudflare R2) there.
+services:
+  - type: web
+    name: our-little-world
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGIN
+        sync: false # e.g. https://our-little-world.onrender.com
+      - key: MONGODB_URI
+        sync: false # MongoDB Atlas connection string
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: MEDIA_SIGNING_SECRET
+        generateValue: true
+      - key: REGISTRATION_MODE
+        value: invite_only
+      - key: UPLOAD_DIR
+        value: /data/uploads
+    disk:
+      name: olw-data
+      mountPath: /data
+      sizeGB: 5

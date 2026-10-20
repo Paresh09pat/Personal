@@ -1,0 +1,40 @@
+{
+  "name": "@olw/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "scripts": {
+    "dev": "node --watch-path=./src --watch-path=../../packages/shared/src src/index.js",
+    "start": "node src/index.js",
+    "test": "vitest run",
+    "test:isolation": "vitest run test/isolation.test.js",
+    "migrate:legacy": "node src/scripts/migrate-legacy.js",
+    "create-admin": "node src/scripts/create-admin.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1153.0",
+    "@aws-sdk/s3-request-presigner": "3.1153.0",
+    "@node-rs/argon2": "2.2.2",
+    "@olw/shared": "1.0.0",
+    "cookie": "2.0.1",
+    "cookie-parser": "1.4.7",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.1",
+    "file-type": "22.2.0",
+    "helmet": "8.3.0",
+    "mongodb-memory-server-core": "11.3.0",
+    "mongoose": "8.24.5",
+    "next": "16.4.2",
+    "nodemailer": "10.1.7",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "socket.io": "4.8.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "socket.io-client": "4.8.4",
+    "supertest": "7.3.1",
+    "vitest": "5.0.5"
+  }
+}
