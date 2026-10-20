@@ -44,9 +44,19 @@ running. Everything (API, realtime and website) ships as one service from one `D
 New project → Deploy from repo (it detects the `Dockerfile`) → add a Volume mounted at `/data` → set the
 same variables as above (`APP_ORIGIN` = your Railway domain).
 
-### Render
-Use `render.yaml` (Blueprint). Persistent disks need a paid instance. On the free instance set
-`STORAGE_DRIVER=s3` with R2 credentials, because the free disk is wiped on every deploy.
+### Render (free)
+1. Create a MongoDB Atlas M0 cluster. Under **Network Access**, allow `0.0.0.0/0`, because Render's free
+   outbound IPs change. Copy the `mongodb+srv://…` string and put your DB user's password into it.
+2. On render.com, sign in with GitHub, then go to **New → Blueprint**, pick this repo, and paste
+   `MONGODB_URI` when asked. Everything else comes from `render.yaml`: secrets are generated, photos are
+   stored in MongoDB (`STORAGE_DRIVER=mongo`), and `APP_ORIGIN` is detected.
+3. Wait for the first deploy (the Docker build takes a few minutes), open `https://<name>.onrender.com`,
+   and **register your own account first**. The first account becomes the admin.
+
+Free-plan limits: the service sleeps after 15 minutes without traffic and takes about a minute to wake
+up. Calls and live notifications don't work while it's asleep, and photos share Atlas's ~512 MB. For
+always-on, switch to a paid instance with a disk (`plan: starter`, `STORAGE_DRIVER=local`,
+`UPLOAD_DIR=/data/uploads`, disk mounted at `/data`).
 
 ### Any VPS (Docker)
 ```sh

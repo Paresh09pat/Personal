@@ -1,27 +1,24 @@
-# Render Blueprint. Note: persistent disks need a paid instance. On the free instance the disk is
-# wiped on every deploy/restart, so use STORAGE_DRIVER=s3 (e.g. Cloudflare R2) there.
+# Render Blueprint — FREE plan.
+# Free web services sleep after 15 min without traffic (~1 min to wake) and their disk is wiped,
+# so photos/videos are stored in MongoDB (STORAGE_DRIVER=mongo). APP_ORIGIN is detected automatically.
+# For an always-on setup switch to plan: starter and add a disk (see docs/DEPLOYMENT.md).
 services:
   - type: web
     name: our-little-world
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /healthz
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: APP_ORIGIN
-        sync: false # e.g. https://our-little-world.onrender.com
       - key: MONGODB_URI
-        sync: false # MongoDB Atlas connection string
+        sync: false # paste your MongoDB Atlas connection string when Render asks
       - key: SESSION_SECRET
         generateValue: true
       - key: MEDIA_SIGNING_SECRET
         generateValue: true
       - key: REGISTRATION_MODE
         value: invite_only
-      - key: UPLOAD_DIR
-        value: /data/uploads
-    disk:
-      name: olw-data
-      mountPath: /data
-      sizeGB: 5
+      - key: STORAGE_DRIVER
+        value: mongo

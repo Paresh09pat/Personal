@@ -132,8 +132,11 @@ export function mediaRoutes({ config, storage }) {
     return { ctx, attachment };
   };
 
+  // Only drivers that stream through this server (local disk, MongoDB) use these routes; S3 is direct.
+  const proxied = storage.kind !== 's3';
+
   router.put('/upload/:token', async (req, res) => {
-    if (storage.kind !== 'local') throw notFound();
+    if (!proxied) throw notFound();
     const { attachment } = await authorize(req, 'up');
     if (attachment.status !== 'pending' || !sameId(attachment.uploaderId, req.user._id)) throw notFound();
     const declared = Number(req.get('content-length'));
@@ -143,7 +146,7 @@ export function mediaRoutes({ config, storage }) {
   });
 
   router.get('/file/:token', async (req, res) => {
-    if (storage.kind !== 'local') throw notFound();
+    if (!proxied) throw notFound();
     const { ctx, attachment } = await authorize(req, 'dl');
     if (attachment.status !== 'ready' || !canViewAttachment(ctx, attachment)) throw notFound();
     await storage.send(res, attachment);

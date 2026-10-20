@@ -33,7 +33,7 @@ const schema = z.object({
   MONGO_DEV_PORT: z.coerce.number().int().default(27027),
   SESSION_SECRET: z.string().min(16).default(DEV_SECRET),
   MEDIA_SIGNING_SECRET: z.string().min(16).default(DEV_SECRET),
-  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  STORAGE_DRIVER: z.enum(['local', 's3', 'mongo']).default('local'),
   UPLOAD_DIR: z.string().default('.data/uploads'),
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().default('auto'),
@@ -71,7 +71,10 @@ function loadDotEnv() {
  */
 export function loadConfig(overrides = {}) {
   if (!overrides.skipDotEnv) loadDotEnv();
-  const parsed = schema.safeParse({ ...process.env, ...overrides.env });
+  const raw = { ...process.env, ...overrides.env };
+  // On Render the public URL is provided automatically, so APP_ORIGIN doesn't need to be set by hand.
+  if (!raw.APP_ORIGIN && raw.RENDER_EXTERNAL_URL) raw.APP_ORIGIN = raw.RENDER_EXTERNAL_URL;
+  const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${issues}`);

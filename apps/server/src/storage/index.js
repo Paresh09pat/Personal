@@ -1,9 +1,12 @@
 import { fileTypeFromBuffer } from 'file-type';
 import { LocalDiskStorage } from './local.js';
 import { S3Storage } from './s3.js';
+import { GridFsStorage } from './gridfs.js';
+
+const DRIVERS = { local: LocalDiskStorage, s3: S3Storage, mongo: GridFsStorage };
 
 export async function createStorage(config) {
-  const storage = config.storage.driver === 's3' ? new S3Storage(config) : new LocalDiskStorage(config);
+  const storage = new DRIVERS[config.storage.driver](config);
   await storage.init();
   return storage;
 }
