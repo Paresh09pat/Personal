@@ -78,3 +78,15 @@ Concurrent accepts can't both win.
 `apps/server/test` boots the real app against a real MongoDB replica set (mongodb-memory-server). Nothing in
 authorization is mocked. `isolation.test.js` is the three-user (A, B, C) suite covering all 10 required checks,
 plus a sweep that calls every read and write endpoint of the other space and expects 404.
+
+## Group spaces
+
+A space has a `kind`: `direct` (the original two-person space) or `group` (up to `MAX_GROUP_PARTICIPANTS` = 30 people).
+Spaces written before groups existed have no `kind` and are treated as `direct`.
+
+- **Same isolation rules.** Membership is still checked on every request, socket event and file download through `requireMember()`; content is still queried through `scoped()`. A group is just a space with more active participants.
+- **`ctx.others` instead of `ctx.partner`.** `buildContext()` returns every *other active* person in `ctx.others`. `ctx.partner` exists only in 1:1 spaces and is `null` in groups, so code that wrongly assumes a single partner fails loudly. Notifications use `notifyOthers()`.
+- **Roles.** The creator is `owner`; owners and `admin`s can make invite links, remove people and delete the group. Only the owner can remove or demote an admin. Anyone can leave; if the last admin leaves, the longest-standing member is promoted; the last person to leave deletes the group.
+- **Invitations.** A group link is shareable (optionally limited to N people) and expires; making a new link revokes the old one. Removed people cannot rejoin with an old link, people who left can rejoin. The member cap is enforced by the schema validator and verified by a concurrent-join test.
+- **Not in groups (yet):** calls, letters and surprises (they are person-to-person) — the API answers 409 and the tabs are hidden.
+- **No `pairKey`.** Only 1:1 spaces carry a `pairKey`, so the one-space-per-pair rule does not affect groups.

@@ -1,7 +1,7 @@
 import express from 'express';
 import { SURPRISE_STATUS, surpriseSchema } from '@olw/shared';
 import { Attachment, Relationship, Surprise } from '../models/index.js';
-import { assertAttachments, buildContext, partnerId, scoped } from '../authz/relationship.js';
+import { assertAttachments, assertDirect, buildContext, partnerId, scoped } from '../authz/relationship.js';
 import { HttpError, forbidden, notFound } from '../lib/errors.js';
 import { parse, parsePatch, sameId, toObjectId } from '../lib/validate.js';
 import { id } from '../lib/serialize.js';
@@ -76,6 +76,10 @@ function validateSchedule(status, revealAt) {
 
 export function surpriseRoutes({ hub }) {
   const router = express.Router({ mergeParams: true });
+  router.use((req, _res, next) => {
+    assertDirect(req.ctx, 'Surprises are for one-to-one chats');
+    next();
+  });
 
   const load = async (ctx, surpriseId) => {
     const s = await scoped(Surprise, ctx).findOne({

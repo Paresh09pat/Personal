@@ -10,6 +10,9 @@ import { createMessage, toggleReaction, updateReadMarker } from '../features/mes
 import { callView, finishCall, readCallToken } from '../features/calls.js';
 import { callRoom, relRoom, userRoom } from './hub.js';
 
+/** How long a dropped call participant has to come back before the call is ended. */
+const CALL_DISCONNECT_GRACE_MS = 12 * 1000;
+
 const relPayload = z.object({ relationshipId: objectId });
 const MAX_SIGNAL_BYTES = 64 * 1024;
 
@@ -53,6 +56,12 @@ export function attachSocketServer(httpServer, deps) {
 
   io.on('connection', (socket) => {
     const userId = socket.data.userId;
+    /** Tell a room this user went offline, unless another tab of theirs is still in it. */
+    const announceOffline = async (room) => {
+      const sockets = await io.in(room).fetchSockets();
+      if (sockets.some((s) => s.id !== socket.id && String(s.data.userId) === String(userId))) return;
+      socket.to(room).emit(EVENTS.PRESENCE, { relationshipId: room.slice(4), userId: String(userId), online: false });
+    };
     socket.join(userRoom(userId));
 
     /** Validates payload, re-authorises, runs handler, acks {ok, ...} or {ok:false, error}. */
@@ -89,7 +98,7 @@ export function attachSocketServer(httpServer, deps) {
       const room = relRoom(id.data.relationshipId);
       if (!socket.rooms.has(room)) return;
       socket.leave(room);
-      socket.to(room).emit(EVENTS.PRESENCE, { relationshipId: id.data.relationshipId, userId: String(userId), online: false });
+      announceOffline(room).catch(() => {});
     });
 
     on(
@@ -143,7 +152,9 @@ export function attachSocketServer(httpServer, deps) {
           await call.save();
         }
         socket.to(callRoom(call._id)).emit(EVENTS.CALL_PEER_JOINED, { callId: data.callId, userId: String(userId) });
-        return { call: callView(call) };
+        // Tell a late joiner whether the other side is already here (it then must not wait for a "peer joined").
+        const peers = (await io.in(callRoom(call._id)).fetchSockets()).filter((s) => s.id !== socket.id).length;
+        return { call: callView(call), peers };
       },
       { scopedToRel: false },
     );
@@ -173,9 +184,22 @@ export function attachSocketServer(httpServer, deps) {
     );
 
     socket.on('disconnecting', () => {
+      // Closed tab / lost connection during a call: if the call is not back to two people shortly, end it for both.
+      const callIds = [...socket.rooms].filter((r) => r.startsWith('call:')).map((r) => r.slice(5));
+      if (callIds.length) {
+        setTimeout(async () => {
+          for (const callId of callIds) {
+            try {
+              const call = await CallRecord.findOne({ _id: callId, status: { $in: ['ringing', 'active'] } });
+              if (call && (await hub.callOccupancy(callId)) < 2) await finishCall(call, 'ended', userId, hub);
+            } catch (err) {
+              console.error('[calls] disconnect cleanup', err.message);
+            }
+          }
+        }, CALL_DISCONNECT_GRACE_MS).unref();
+      }
       for (const room of socket.rooms) {
-        if (!room.startsWith('rel:')) continue;
-        socket.to(room).emit(EVENTS.PRESENCE, { relationshipId: room.slice(4), userId: String(userId), online: false });
+        if (room.startsWith('rel:')) announceOffline(room).catch(() => {});
       }
     });
   });

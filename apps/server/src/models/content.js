@@ -24,6 +24,9 @@ function scopedSchema(definition) {
   return schema;
 }
 
+/** Query fragment: messages that have not yet disappeared. */
+export const notExpired = () => ({ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
+
 const model = (name, schema) => mongoose.models[name] ?? mongoose.model(name, schema);
 
 // ── Messages ─────────────────────────────────────────────────────────────
@@ -40,8 +43,11 @@ const messageSchema = scopedSchema({
   },
   editedAt: { type: Date, default: null },
   deletedAt: { type: Date, default: null },
+  /** Disappearing messages: hidden everywhere and then swept once this time passes. */
+  expiresAt: { type: Date, default: null },
 });
 messageSchema.index({ relationshipId: 1, _id: 1 });
+messageSchema.index({ expiresAt: 1 }, { partialFilterExpression: { expiresAt: { $type: 'date' } } });
 messageSchema.index({ relationshipId: 1, senderId: 1, clientId: 1 }, { unique: true });
 
 // ── Attachments (private media) ──────────────────────────────────────────

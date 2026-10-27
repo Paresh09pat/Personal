@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { ImagePlus, LogOut, MailWarning, MessageCirclePlus, MoreVertical, Search, UserRound } from 'lucide-react';
+import { ImagePlus, LogOut, MailWarning, MessageCirclePlus, MoreVertical, Search, UserRound, Users } from 'lucide-react';
 import { api } from '@/lib/api';
-import { useMe, useRelationships } from '@/lib/hooks';
-import { listTime, spaceName, spaceSubtitle } from '@/lib/space';
+import { useAuthConfig, useMe, useRelationships } from '@/lib/hooks';
+import { isGroupSpace, listTime, spaceAvatar, spaceName, spaceSubtitle } from '@/lib/space';
 import { Avatar, Spinner, cx } from './ui';
 import { useToast } from './Toast';
 import { CreateSpaceModal } from './CreateSpaceModal';
@@ -25,7 +25,14 @@ function ChatRow({ space, active }) {
       )}
       aria-current={active ? 'page' : undefined}
     >
-      <Avatar name={spaceName(space)} src={space.partner?.avatarUrl} size={50} />
+      <span className="relative shrink-0">
+        <Avatar name={spaceName(space)} src={spaceAvatar(space)} size={50} />
+        {isGroupSpace(space) && (
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-surface-solid">
+            <Users className="h-3 w-3" />
+          </span>
+        )}
+      </span>
       <div className="min-w-0 flex-1 border-b border-line pb-3 pt-1">
         <div className="flex items-baseline justify-between gap-2">
           <p className="truncate text-[15px] font-semibold">{spaceName(space)}</p>
@@ -103,7 +110,9 @@ export function ChatList({ createOpen, onCreateOpenChange }) {
   const toast = useToast();
   const [query, setQuery] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const { data: authConfig } = useAuthConfig();
   const isAdmin = Boolean(me?.user?.isAdmin);
+  const canCreate = isAdmin || authConfig?.spaceCreation === 'everyone';
   const user = me?.user;
 
   const q = query.trim().toLowerCase();
@@ -119,8 +128,8 @@ export function ChatList({ createOpen, onCreateOpenChange }) {
           <Avatar name={user?.displayName} size={40} />
         </Link>
         <h1 className="flex-1 font-display text-3xl font-semibold">Chats</h1>
-        {isAdmin && (
-          <button onClick={() => onCreateOpenChange(true)} className="rounded-full p-2 text-accent hover:bg-accent-soft" aria-label="New chat" title="New chat">
+        {canCreate && (
+          <button onClick={() => onCreateOpenChange(true)} className="rounded-full p-2 text-accent hover:bg-accent-soft" aria-label="New chat or group" title="New chat or group">
             <MessageCirclePlus className="h-5 w-5" />
           </button>
         )}
@@ -149,9 +158,9 @@ export function ChatList({ createOpen, onCreateOpenChange }) {
           <Spinner />
         ) : (spaces ?? []).length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-ink-soft">
-            {isAdmin ? (
+            {canCreate ? (
               <>
-                <p className="mb-4">No chats yet. Start one and send her your private invite link 💌</p>
+                <p className="mb-4">No chats yet. Start a chat or a group and send your private invite link 💌</p>
                 <button onClick={() => onCreateOpenChange(true)} className="rounded-full bg-accent px-5 py-2.5 font-medium text-accent-ink">
                   Start a chat
                 </button>
@@ -174,7 +183,7 @@ export function ChatList({ createOpen, onCreateOpenChange }) {
         )}
       </nav>
 
-      {isAdmin && <CreateSpaceModal open={createOpen} onClose={() => onCreateOpenChange(false)} myName={user?.displayName} />}
+      {canCreate && <CreateSpaceModal open={createOpen} onClose={() => onCreateOpenChange(false)} myName={user?.displayName} />}
       <MultiSpaceUpload open={uploadOpen} onClose={() => setUploadOpen(false)} spaces={spaces ?? []} />
     </div>
   );

@@ -1,6 +1,6 @@
-import { PARTICIPANT_STATUS, RELATIONSHIP_STATUS } from '@olw/shared';
+import { ADMIN_ROLES, PARTICIPANT_STATUS, RELATIONSHIP_STATUS, SPACE_KIND } from '@olw/shared';
 import { Attachment, Relationship } from '../models/index.js';
-import { HttpError, notFound } from '../lib/errors.js';
+import { HttpError, forbidden, notFound } from '../lib/errors.js';
 import { sameId, toObjectId } from '../lib/validate.js';
 
 /**
@@ -32,8 +32,33 @@ export function buildContext(rel, userId) {
     (p) => sameId(p.userId, userId) && p.status === PARTICIPANT_STATUS.ACTIVE,
   );
   if (!me) throw notFound();
-  const partner = rel.participants.find((p) => !sameId(p.userId, userId)) ?? null;
-  return { rel, relationshipId: rel._id, userId: me.userId, me, partner };
+  const kind = rel.kind ?? SPACE_KIND.DIRECT;
+  // `others` = every other ACTIVE person. `partner` exists only in 1:1 spaces, so code that wrongly
+  // assumes a single partner in a group gets null and fails loudly instead of picking someone at random.
+  const others = rel.participants.filter((p) => p.status === PARTICIPANT_STATUS.ACTIVE && !sameId(p.userId, userId));
+  const partner =
+    kind === SPACE_KIND.DIRECT ? (rel.participants.find((p) => !sameId(p.userId, userId)) ?? null) : null;
+  return {
+    rel,
+    kind,
+    relationshipId: rel._id,
+    userId: me.userId,
+    me,
+    partner,
+    others,
+    isAdmin: ADMIN_ROLES.includes(me.role),
+  };
+}
+
+export const isGroup = (ctx) => ctx.kind === SPACE_KIND.GROUP;
+export const recipientIds = (ctx) => ctx.others.map((p) => p.userId);
+
+export function assertAdmin(ctx) {
+  if (!ctx.isAdmin) throw forbidden('Only a group admin can do that');
+}
+
+export function assertDirect(ctx, message = 'This is only available in one-to-one chats') {
+  if (isGroup(ctx)) throw new HttpError(409, message, { code: 'direct_only' });
 }
 
 export function assertWritable(ctx) {

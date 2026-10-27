@@ -14,7 +14,15 @@ export const PARTICIPANT_STATUS = Object.freeze({
 export const PARTICIPANT_ROLE = Object.freeze({
   OWNER: 'owner',
   PARTNER: 'partner',
+  ADMIN: 'admin',
+  MEMBER: 'member',
 });
+
+/** Roles that may manage a group (invite links, removing people, deleting it). */
+export const ADMIN_ROLES = Object.freeze(['owner', 'admin']);
+
+/** A 1:1 space is exactly two people; a group holds up to MAX_GROUP_PARTICIPANTS. */
+export const SPACE_KIND = Object.freeze({ DIRECT: 'direct', GROUP: 'group' });
 
 export const INVITATION_STATUS = Object.freeze({
   PENDING: 'pending',
@@ -34,10 +42,23 @@ export const MESSAGE_TYPES = Object.freeze(['text', 'image', 'video', 'voice', '
 
 export const ATTACHMENT_KINDS = Object.freeze(['image', 'video', 'audio', 'file']);
 
-export const ATTACHMENT_PURPOSES = Object.freeze(['message', 'gallery', 'memory', 'avatar', 'cover', 'surprise']);
+export const ATTACHMENT_PURPOSES = Object.freeze(['message', 'gallery', 'memory', 'avatar', 'cover', 'surprise', 'wallpaper']);
 
-/** Exactly two people share a space. Never more. */
+/** Shared chat themes (both people see the same one). "custom" = an uploaded photo wallpaper. */
+export const CHAT_THEMES = Object.freeze([
+  'classic', 'love', 'blossom', 'rosegold', 'valentine', 'candy',
+  'midnight', 'aurora', 'neon', 'lofi',
+  'ocean', 'beach', 'mint', 'forest',
+  'celebration', 'snow', 'custom',
+]);
+
+/** Disappearing messages: 0 = off, otherwise seconds (1 minute to 30 days). */
+export const DISAPPEAR = Object.freeze({ minSec: 60, maxSec: 30 * 24 * 60 * 60 });
+
+/** A 1:1 space holds exactly two people. Never more. */
 export const MAX_ACTIVE_PARTICIPANTS = 2;
+export const MAX_DIRECT_PARTICIPANTS = MAX_ACTIVE_PARTICIPANTS;
+export const MAX_GROUP_PARTICIPANTS = 30;
 
 export const LIMITS = Object.freeze({
   messageBody: 4000,

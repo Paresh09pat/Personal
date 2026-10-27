@@ -19,7 +19,7 @@ const COLORS = {
 };
 
 export default function NotesPage() {
-  const { rid, writable, me, partner } = useSpace();
+  const { rid, writable, me, partner, membersById } = useSpace();
   const queryClient = useQueryClient();
   const { data, isLoading } = useSection(rid, 'notes');
   const [open, setOpen] = useState(false);
@@ -63,7 +63,7 @@ export default function NotesPage() {
       </div>
       {items.length === 0 ? (
         <Card>
-          <EmptyState icon={NotebookPen} title="No notes yet">Leave a little love note for {partner?.displayName ?? 'your person'} to find.</EmptyState>
+          <EmptyState icon={NotebookPen} title="No notes yet">Leave a little love note for {partner?.displayName ?? 'the group'} to find.</EmptyState>
         </Card>
       ) : (
         <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
@@ -72,7 +72,7 @@ export default function NotesPage() {
               <p className="whitespace-pre-wrap font-display text-2xl leading-snug">{n.body}</p>
               <div className="mt-4 flex items-center justify-between text-xs opacity-70">
                 <span>
-                  {n.authorId === me.userId ? 'You' : partner?.displayName} · {fmtRelative(n.createdAt)}
+                  {n.authorId === me.userId ? 'You' : (membersById.get(n.authorId)?.displayName ?? 'Someone')} · {fmtRelative(n.createdAt)}
                 </span>
                 {writable && n.authorId === me.userId && (
                   <span className="flex gap-1">

@@ -1,4 +1,4 @@
-import { PARTICIPANT_STATUS } from '@olw/shared';
+import { ADMIN_ROLES, PARTICIPANT_STATUS, SPACE_KIND } from '@olw/shared';
 import { User } from '../models/index.js';
 import { sameId } from './validate.js';
 
@@ -44,14 +44,27 @@ export function participantView(rel, p, users) {
 /** A space as seen by `userId`. Never includes the partner's private settings. */
 export function relationshipView(rel, userId, users, extra = {}) {
   const me = rel.participants.find((p) => sameId(p.userId, userId));
-  const partner = rel.participants.find((p) => !sameId(p.userId, userId)) ?? null;
+  const kind = rel.kind ?? SPACE_KIND.DIRECT;
+  const partner = kind === SPACE_KIND.DIRECT ? (rel.participants.find((p) => !sameId(p.userId, userId)) ?? null) : null;
+  const active = rel.participants.filter((p) => p.status === PARTICIPANT_STATUS.ACTIVE);
   return {
     id: id(rel._id),
+    kind,
+    memberCount: active.length,
+    members:
+      kind === SPACE_KIND.GROUP
+        ? active.map((p) => ({
+            ...participantView(rel, p, users),
+            isMe: sameId(p.userId, userId),
+            lastReadAt: p.lastReadAt,
+          }))
+        : undefined,
     status: rel.status,
     title: rel.title,
     anniversaryDate: rel.anniversaryDate,
     preferences: rel.preferences,
     coverUrl: attachmentContentUrl(rel._id, rel.coverAttachmentId),
+    wallpaperUrl: attachmentContentUrl(rel._id, rel.preferences?.wallpaperAttachmentId),
     coverAttachmentId: id(rel.coverAttachmentId),
     createdAt: rel.createdAt,
     lastActivityAt: rel.lastActivityAt,
@@ -60,6 +73,7 @@ export function relationshipView(rel, userId, users, extra = {}) {
     me: {
       ...participantView(rel, me, users),
       ownDisplayName: me.displayName,
+      isAdmin: ADMIN_ROLES.includes(me.role),
       avatarAttachmentId: id(me.avatarAttachmentId),
       notificationPrefs: me.notificationPrefs,
       lastReadAt: me.lastReadAt,
@@ -105,6 +119,7 @@ export function messageView(m, attachmentsById = new Map()) {
     replyToId: id(m.replyToId),
     reactions: m.reactions.map((r) => ({ userId: id(r.userId), emoji: r.emoji })),
     editedAt: m.editedAt,
+    expiresAt: m.expiresAt ?? null,
     createdAt: m.createdAt,
   };
 }

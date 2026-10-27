@@ -1,17 +1,36 @@
 import {
   LIMITS,
+  SPACE_KIND,
   PARTICIPANT_ROLE,
   PARTICIPANT_STATUS,
   RELATIONSHIP_STATUS,
 } from '@olw/shared';
-import { Message, Relationship } from '../models/index.js';
+import { Message, Relationship, notExpired } from '../models/index.js';
 import { assertAttachments } from '../authz/relationship.js';
 import { HttpError } from '../lib/errors.js';
 import { loadUsers, relationshipView } from '../lib/serialize.js';
 import { sameId } from '../lib/validate.js';
 
 export async function createRelationship(user, input) {
+  if (input.kind === SPACE_KIND.GROUP) {
+    // A group is usable straight away: nobody has to accept anything before the creator can start chatting.
+    return Relationship.create({
+      kind: SPACE_KIND.GROUP,
+      status: RELATIONSHIP_STATUS.ACTIVE,
+      createdBy: user._id,
+      title: input.title,
+      participants: [
+        {
+          userId: user._id,
+          role: PARTICIPANT_ROLE.OWNER,
+          status: PARTICIPANT_STATUS.ACTIVE,
+          displayName: input.myDisplayName ?? '',
+        },
+      ],
+    });
+  }
   const pending = await Relationship.countDocuments({
+    kind: { $ne: SPACE_KIND.GROUP },
     createdBy: user._id,
     status: RELATIONSHIP_STATUS.PENDING,
   });
@@ -41,16 +60,21 @@ export function unreadCount(rel, userId) {
     relationshipId: rel._id,
     senderId: { $ne: userId },
     deletedAt: null,
+    ...notExpired(),
     ...(me?.lastReadAt ? { createdAt: { $gt: me.lastReadAt } } : {}),
   });
 }
 
-async function lastMessagePreview(rel) {
-  const m = await Message.findOne({ relationshipId: rel._id, deletedAt: null }).sort({ createdAt: -1, _id: -1 });
+async function lastMessagePreview(rel, users) {
+  const m = await Message.findOne({ relationshipId: rel._id, deletedAt: null, ...notExpired() }).sort({ createdAt: -1, _id: -1 });
   if (!m) return null;
   const label = { image: '📷 Photo', video: '🎬 Video', voice: '🎙 Voice message', file: '📎 Attachment' };
+  // Notices like "Uma joined" belong to nobody, so the list shows them without a "You:" / name prefix.
+  if (m.type === 'system') return { senderId: null, senderName: '', preview: m.body.slice(0, 120), createdAt: m.createdAt };
+  const sender = rel.participants.find((p) => sameId(p.userId, m.senderId));
   return {
     senderId: String(m.senderId),
+    senderName: sender?.displayName || users.get(String(m.senderId))?.displayName || '',
     preview: m.body ? m.body.slice(0, 120) : (label[m.type] ?? ''),
     createdAt: m.createdAt,
   };
@@ -66,7 +90,7 @@ export async function listForUser(userId) {
     rels.map(async (rel) =>
       relationshipView(rel, userId, users, {
         unreadCount: await unreadCount(rel, userId),
-        lastMessage: await lastMessagePreview(rel),
+        lastMessage: await lastMessagePreview(rel, users),
       }),
     ),
   );
@@ -87,6 +111,7 @@ export async function updateRelationship(ctx, patch) {
     throw new HttpError(403, 'This space is read-only', { code: 'space_read_only' });
   }
   if (patch.coverAttachmentId) await assertAttachments(ctx, [patch.coverAttachmentId]);
+  if (patch.preferences?.wallpaperAttachmentId) await assertAttachments(ctx, [patch.preferences.wallpaperAttachmentId]);
   const rel = ctx.rel;
   if (patch.title !== undefined) rel.title = patch.title;
   if (patch.anniversaryDate !== undefined) rel.anniversaryDate = patch.anniversaryDate;

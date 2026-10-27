@@ -9,6 +9,7 @@ import {
   memorySchema,
   milestoneSchema,
   readSchema,
+  setMemberRoleSchema,
   updateMyParticipantSchema,
   updateRelationshipSchema,
 } from '@olw/shared';
@@ -16,6 +17,8 @@ import { Album, LoveNote, Memory, Milestone } from '../models/index.js';
 import {
   assertAttachments,
   assertWritable,
+  buildContext,
+  isGroup,
   loadMembership,
   requireWritableForMutations,
   scoped,
@@ -37,12 +40,15 @@ import {
   archive,
   deletePendingSpace,
   endRelationship,
+  leaveGroup,
+  removeMember,
   requestDeletion,
+  setMemberRole,
   unarchive,
   withdrawDeletion,
 } from './lifecycle.js';
 import { EVENTS } from '@olw/shared';
-import { messageRoutes, updateReadMarker } from '../features/messages.js';
+import { describeDuration, messageRoutes, postSystemMessage, updateReadMarker } from '../features/messages.js';
 import { attachmentRoutes } from '../features/attachments.js';
 import { crudRoutes } from '../features/crud.js';
 import { letterRoutes } from '../features/letters.js';
@@ -67,7 +73,7 @@ export function relationshipRoutes(deps) {
       throw new HttpError(403, 'Only the owner of this site can create new spaces', { code: 'admin_only' });
     }
     const rel = await createRelationship(req.user, parse(createRelationshipSchema, req.body));
-    const ctx = { rel, relationshipId: rel._id, userId: req.user._id, me: rel.participants[0], partner: null };
+    const ctx = buildContext(rel, req.user._id);
     res.status(201).json({ relationship: await viewFor(ctx) });
   });
 
@@ -82,7 +88,13 @@ export function relationshipRoutes(deps) {
   space.get('/', respondWithSpace);
 
   space.patch('/', async (req, res) => {
-    await updateRelationship(req.ctx, parsePatch(updateRelationshipSchema, req.body));
+    const patch = parsePatch(updateRelationshipSchema, req.body);
+    const beforeTimer = req.ctx.rel.preferences?.disappearAfterSec ?? 0;
+    await updateRelationship(req.ctx, patch);
+    const { disappearAfterSec: timer = 0 } = req.ctx.rel.preferences;
+    if (timer !== beforeTimer) {
+      await postSystemMessage(req.ctx, timer ? `Disappearing messages: ${describeDuration(timer)}` : 'Disappearing messages turned off', hub);
+    }
     hub.toRelationship(req.ctx.relationshipId, EVENTS.RELATIONSHIP_UPDATED, { status: req.ctx.rel.status });
     await respondWithSpace(req, res);
   });
@@ -122,6 +134,23 @@ export function relationshipRoutes(deps) {
     await verifyDestructiveConfirmation(req.ctx.userId, parse(confirmDestructiveSchema, req.body), 'END');
     await endRelationship(req.ctx, hub);
     await respondWithSpace(req, res);
+  });
+  // ── Group membership ──────────────────────────────────────────────────
+  const groupOnly = (req) => {
+    if (!isGroup(req.ctx)) throw new HttpError(409, 'This only applies to group chats', { code: 'group_only' });
+  };
+  space.post('/leave', async (req, res) => {
+    groupOnly(req);
+    res.json(await leaveGroup(req.ctx, deps));
+  });
+  space.delete('/members/:userId', async (req, res) => {
+    groupOnly(req);
+    res.json(await removeMember(req.ctx, toObjectId(req.params.userId), hub));
+  });
+  space.patch('/members/:userId', async (req, res) => {
+    groupOnly(req);
+    const { role } = parse(setMemberRoleSchema, req.body);
+    res.json(await setMemberRole(req.ctx, toObjectId(req.params.userId), role, hub));
   });
   space.post('/deletion-request', limiters.destructive, async (req, res) => {
     await verifyDestructiveConfirmation(req.ctx.userId, parse(confirmDestructiveSchema, req.body));

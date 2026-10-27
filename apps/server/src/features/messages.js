@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import {
   EVENTS,
@@ -6,7 +7,7 @@ import {
   reactSchema,
   sendMessageSchema,
 } from '@olw/shared';
-import { Attachment, Message } from '../models/index.js';
+import { Attachment, Message, notExpired } from '../models/index.js';
 import { assertAttachments, assertWritable, scoped } from '../authz/relationship.js';
 import { forbidden, notFound } from '../lib/errors.js';
 import { parse, sameId, toObjectId } from '../lib/validate.js';
@@ -41,6 +42,7 @@ export async function createMessage(ctx, rawInput, hub) {
   }
   const type = attachments.length ? (KIND_TO_TYPE[attachments[0].kind] ?? 'file') : 'text';
 
+  const ttlSec = ctx.rel.preferences?.disappearAfterSec || 0;
   let message;
   let created = true;
   try {
@@ -51,6 +53,7 @@ export async function createMessage(ctx, rawInput, hub) {
       body: input.body,
       attachmentIds: attachments.map((a) => a._id),
       replyToId: input.replyToId ?? null,
+      expiresAt: ttlSec ? new Date(Date.now() + ttlSec * 1000) : null,
     });
   } catch (err) {
     if (err?.code !== 11000) throw err;
@@ -69,11 +72,31 @@ export async function createMessage(ctx, rawInput, hub) {
   return view;
 }
 
+const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+export function describeDuration(sec) {
+  if (sec % 86400 === 0) return plural(sec / 86400, 'day');
+  if (sec % 3600 === 0) return plural(sec / 3600, 'hour');
+  return plural(Math.round(sec / 60), 'minute');
+}
+
+/** A centred notice in the chat ("Disappearing messages: 24 hours"). Never expires itself. */
+export async function postSystemMessage(ctx, body, hub) {
+  const message = await scoped(Message, ctx).create({
+    senderId: ctx.userId,
+    clientId: `sys-${crypto.randomUUID()}`,
+    type: 'system',
+    body,
+  });
+  const [view] = await viewMessages(ctx, [message]);
+  hub.toRelationship(ctx.relationshipId, EVENTS.MESSAGE_NEW, { message: view });
+  return view;
+}
+
 export async function toggleReaction(ctx, messageId, rawInput, hub) {
   assertWritable(ctx);
   const { emoji } = parse(reactSchema, rawInput);
   const message = await scoped(Message, ctx).byId(messageId);
-  if (!message || message.deletedAt) throw notFound();
+  if (!message || message.deletedAt || (message.expiresAt && message.expiresAt <= new Date())) throw notFound();
   const mine = message.reactions.find((r) => sameId(r.userId, ctx.userId));
   message.reactions = message.reactions.filter((r) => !sameId(r.userId, ctx.userId));
   if (!mine || mine.emoji !== emoji) message.reactions.push({ userId: ctx.userId, emoji });
@@ -102,7 +125,7 @@ export function messageRoutes({ hub }) {
 
   router.get('/', async (req, res) => {
     const { before, limit } = parse(paginationSchema, req.query);
-    const filter = before ? { _id: { $lt: toObjectId(before) } } : {};
+    const filter = { ...notExpired(), ...(before ? { _id: { $lt: toObjectId(before) } } : {}) };
     const docs = await scoped(Message, req.ctx)
       .find(filter)
       .sort({ _id: -1 })

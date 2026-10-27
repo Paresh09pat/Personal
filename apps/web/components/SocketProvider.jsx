@@ -41,7 +41,8 @@ export function SocketProvider({ children }) {
       queryClient.invalidateQueries({ queryKey: qk.relationships });
       const viewingThatChat = pathname === `/r/${n.relationshipId}`;
       if (!n.silent && !viewingThatChat && n.type !== 'call') {
-        toast(n.type === 'message' ? `New message: ${n.text || '💌'}` : n.text || 'Something new for you 💗', {
+        const who = n.kind === 'group' && n.fromName ? `${n.fromName}: ` : '';
+        toast(n.type === 'message' ? `${who || 'New message: '}${n.text || '💌'}` : n.text || 'Something new for you 💗', {
           href: `/r/${n.relationshipId}`,
         });
       }

@@ -6,7 +6,7 @@ import { Check, ImagePlus, ShieldCheck } from 'lucide-react';
 import { uploadToSpace } from '@/lib/upload';
 import { qk } from '@/lib/queryKeys';
 import { Avatar, Button, ErrorText, Modal, cx } from './ui';
-import { spaceName } from '@/lib/space';
+import { spaceAvatar, spaceName } from '@/lib/space';
 
 /**
  * "Add photos" to the galleries of several of YOUR spaces at once.
@@ -91,7 +91,7 @@ export function MultiSpaceUpload({ open, onClose, spaces }) {
                     selected.has(s.id) ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent',
                   )}
                 >
-                  <Avatar name={spaceName(s)} src={s.partner?.avatarUrl} size={36} />
+                  <Avatar name={spaceName(s)} src={spaceAvatar(s)} size={36} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{spaceName(s)}</span>
                     <span className="block truncate text-xs text-muted">{s.title || 'Gallery'}</span>

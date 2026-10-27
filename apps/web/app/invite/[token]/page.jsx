@@ -58,8 +58,17 @@ export default function InvitePage() {
           <div className="flex items-center gap-4 rounded-2xl bg-accent-soft p-4 text-accent">
             <HeartHandshake className="h-8 w-8 shrink-0" />
             <p>
-              Join <strong>{preview.spaceTitle || 'their little world'}</strong> — a private space just for the two of
-              you. This invitation expires {fmtDate(preview.expiresAt)}.
+              {preview.kind === 'group' ? (
+                <>
+                  Join the group <strong>{preview.spaceTitle}</strong>: a private space with {preview.memberCount}{' '}
+                  {preview.memberCount === 1 ? 'person' : 'people'} so far. This link expires {fmtDate(preview.expiresAt)}.
+                </>
+              ) : (
+                <>
+                  Join <strong>{preview.spaceTitle || 'their little world'}</strong> — a private space just for the two of
+                  you. This invitation expires {fmtDate(preview.expiresAt)}.
+                </>
+              )}
             </p>
           </div>
           {meLoading ? (

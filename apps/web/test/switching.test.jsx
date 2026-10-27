@@ -107,7 +107,7 @@ describe('relationship switching', () => {
         <ChatList createOpen={false} onCreateOpenChange={() => {}} />
       </QueryClientProvider>,
     );
-    expect(screen.getByLabelText('New chat')).toBeTruthy();
+    expect(screen.getByLabelText(/new chat/i)).toBeTruthy();
     expect(screen.getByText('Bella')).toBeTruthy();
     expect(screen.getByText('Cleo')).toBeTruthy();
   });

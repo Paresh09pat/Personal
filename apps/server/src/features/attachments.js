@@ -15,7 +15,7 @@ import { attachmentView } from '../lib/serialize.js';
 import { contentMatchesDeclaredType } from '../storage/index.js';
 import { contentChanged } from './notify.js';
 
-const PROFILE_PURPOSES = new Set(['avatar', 'cover']);
+const PROFILE_PURPOSES = new Set(['avatar', 'cover', 'wallpaper']);
 
 /** Profile pictures may be uploaded while waiting for a partner; everything else needs an active space. */
 function assertCanUpload(ctx, purpose) {

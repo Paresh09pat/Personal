@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -25,8 +25,9 @@ import { CONTENT_KINDS, qk } from '@/lib/queryKeys';
 import { belongsToSpace, clearSpaceCache, upsertMessage } from '@/lib/spaceCache';
 import { useSocket } from './SocketProvider';
 import { useCall } from './CallLayer';
-import { spaceName } from '@/lib/space';
+import { isGroupSpace, joinNames, spaceAvatar, spaceName } from '@/lib/space';
 import { InvitePanel } from './InvitePanel';
+import { themeVars } from '@/lib/chatThemes';
 import { Avatar, Card, EmptyState, Spinner, cx } from './ui';
 
 const SpaceContext = createContext(null);
@@ -57,7 +58,18 @@ export function SpaceShell({ rid, children }) {
   const { startCall, busy } = useCall();
   const { data: space, error, isLoading } = useSpaceDetail(rid);
   const [online, setOnline] = useState([]);
-  const [typing, setTyping] = useState(false);
+  const [typingIds, setTypingIds] = useState([]);
+  const typingTimers = useRef(new Map());
+  const router = useRouter();
+
+  // Group chats have no calls, letters or surprises: bounce anyone who types those URLs.
+  useEffect(() => {
+    if (space && isGroupSpace(space) && /\/(calls|letters|surprises)$/.test(pathname)) router.replace(`/r/${rid}`);
+  }, [space, pathname, rid, router]);
+  useEffect(() => {
+    const timers = typingTimers.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
 
   // Leaving this space (switch or navigate away): drop all of its cached data.
   useEffect(() => () => clearSpaceCache(queryClient, rid), [queryClient, rid]);
@@ -79,8 +91,14 @@ export function SpaceShell({ rid, children }) {
       if (message.attachments?.length) queryClient.invalidateQueries({ queryKey: qk.section(rid, 'gallery') });
     });
     const onTyping = only((p) => {
-      setTyping(p.isTyping);
-      if (p.isTyping) setTimeout(() => setTyping(false), 6000);
+      clearTimeout(typingTimers.current.get(p.userId));
+      if (p.isTyping) {
+        setTypingIds((list) => (list.includes(p.userId) ? list : [...list, p.userId]));
+        // A "stopped typing" event can get lost, so everyone's indicator expires on its own.
+        typingTimers.current.set(p.userId, setTimeout(() => setTypingIds((list) => list.filter((u) => u !== p.userId)), 6000));
+      } else {
+        setTypingIds((list) => list.filter((u) => u !== p.userId));
+      }
     });
     const onPresence = only((p) => setOnline((list) => (p.online ? [...new Set([...list, p.userId])] : list.filter((u) => u !== p.userId))));
     const onRead = only(() => queryClient.invalidateQueries({ queryKey: qk.relDetail(rid) }));
@@ -126,13 +144,24 @@ export function SpaceShell({ rid, children }) {
     );
   }
 
+  const group = isGroupSpace(space);
   const partnerOnline = space.partner ? online.includes(space.partner.userId) : false;
   const writable = space.status === 'active';
   const base = `/r/${rid}`;
   const isChat = pathname === base;
-  const value = { rid, space, partnerOnline, typing, writable, me: space.me, partner: space.partner };
+  // Everyone in this space (me included), looked up by user id. Works the same for 1:1 and groups.
+  const members = group ? (space.members ?? []) : [space.me, space.partner].filter(Boolean);
+  const membersById = new Map(members.map((m) => [m.userId, m]));
+  const others = members.filter((m) => m.userId !== space.me.userId);
+  const typingNames = typingIds.map((id) => membersById.get(id)?.displayName).filter(Boolean);
+  const typing = typingNames.length > 0;
+  const onlineOthers = others.filter((m) => online.includes(m.userId)).length;
+  const value = { rid, space, kind: space.kind, isGroup: group, members, membersById, others, typing, typingNames, partnerOnline, writable, me: space.me, partner: space.partner };
+  const tabs = group ? TABS.filter((t) => !['/letters', '/surprises', '/calls'].includes(t.href)) : TABS;
   const status = typing ? (
-    <span className="text-accent">typing…</span>
+    <span className="text-accent">{group ? `${joinNames(typingNames)} ${typingNames.length > 1 ? 'are' : 'is'} typing…` : 'typing…'}</span>
+  ) : group ? (
+    `${members.length} member${members.length === 1 ? '' : 's'}${onlineOthers ? ` · ${onlineOthers} online` : ''}`
   ) : space.status === 'pending' ? (
     'Waiting to join'
   ) : space.status !== 'active' ? (
@@ -145,20 +174,20 @@ export function SpaceShell({ rid, children }) {
 
   return (
     <SpaceContext.Provider value={value}>
-      <div data-accent={space.preferences?.accent} className="flex h-full min-h-0 flex-col">
+      <div data-accent={space.preferences?.accent} style={themeVars(space.preferences)} className="flex h-full min-h-0 flex-col">
         {/* Header — like a WhatsApp chat header */}
         <header className="flex items-center gap-2 border-b border-line bg-surface-solid/80 px-2 py-2 sm:px-4">
           <Link href="/dashboard" className="rounded-full p-2 text-ink-soft hover:bg-accent-soft md:hidden" aria-label="Back to chats">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <Link href={`${base}/settings`} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-1 py-1 hover:bg-accent-soft/50">
-            <Avatar name={spaceName(space)} src={space.partner?.avatarUrl} size={44} online={space.partnerActive ? partnerOnline : undefined} />
+            <Avatar name={spaceName(space)} src={spaceAvatar(space)} size={44} online={!group && space.partnerActive ? partnerOnline : undefined} />
             <span className="min-w-0">
               <span className="block truncate text-[17px] font-semibold leading-tight">{spaceName(space)}</span>
               <span className="block truncate text-xs text-muted">{status}</span>
             </span>
           </Link>
-          {writable && space.partnerActive && (
+          {writable && !group && space.partnerActive && (
             <div className="flex">
               <button disabled={busy} onClick={() => startCall(rid, 'video', spaceName(space))} className="rounded-full p-2.5 text-accent hover:bg-accent-soft disabled:opacity-40" aria-label="Video call">
                 <Video className="h-5 w-5" />
@@ -172,7 +201,7 @@ export function SpaceShell({ rid, children }) {
 
         {/* Sections of this one space */}
         <nav className="scrollbar-thin flex gap-1 overflow-x-auto border-b border-line px-2 py-2 sm:px-4" aria-label="Sections of this chat">
-          {TABS.map(({ href, label, icon: Icon }) => {
+          {tabs.map(({ href, label, icon: Icon }) => {
             const to = `${base}${href}`;
             const active = href === '' ? isChat : pathname.startsWith(to);
             return (

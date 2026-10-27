@@ -90,3 +90,10 @@ Lifecycle logic lives in `apps/server/src/relationships/lifecycle.js` and `apps/
 | Invitations                   | Kept for audit. Only a SHA-256 hash of the token is ever stored. Expired after 72 h by default |
 | Pending (un-uploaded) attachments | Purged after 24 hours                                           |
 | Notifications                 | 90 days (TTL index)                                                 |
+
+## Group spaces
+
+- A group has no "pending" or "ended" stage. Anyone can **leave** (they lose access immediately and keep nothing of the group; their past messages stay for the others, labelled with the name they used).
+- An **admin** can delete the whole group at any time (password-confirmed). That erases every message, photo and file for everyone, like the final step of a 1:1 deletion.
+- The last person leaving a group deletes it.
+- Deleting your account removes you from every group you are in (the group continues; a last admin hands the role to the longest-standing member).

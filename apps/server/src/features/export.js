@@ -6,6 +6,7 @@ import {
   LoveNote,
   Memory,
   Message,
+  notExpired,
   Milestone,
   Surprise,
 } from '../models/index.js';
@@ -31,7 +32,7 @@ const plain = (doc) => {
 export async function buildExport(ctx, { storage, config }) {
   const s = (Model) => scoped(Model, ctx);
   const [messages, memories, notes, milestones, albums, calls, letters, surprises, attachments] = await Promise.all([
-    s(Message).find({}).sort({ createdAt: 1 }),
+    s(Message).find({ ...notExpired() }).sort({ createdAt: 1 }),
     s(Memory).find({}).sort({ date: 1 }),
     s(LoveNote).find({}).sort({ createdAt: 1 }),
     s(Milestone).find({}).sort({ date: 1 }),

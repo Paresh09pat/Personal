@@ -1,7 +1,7 @@
 import express from 'express';
 import { letterSchema } from '@olw/shared';
 import { Letter } from '../models/index.js';
-import { partnerId, scoped } from '../authz/relationship.js';
+import { assertDirect, partnerId, scoped } from '../authz/relationship.js';
 import { HttpError, forbidden, notFound } from '../lib/errors.js';
 import { parse, parsePatch, sameId, toObjectId } from '../lib/validate.js';
 import { id } from '../lib/serialize.js';
@@ -33,6 +33,10 @@ export const visibleLettersFilter = (userId) => ({ $or: [{ authorId: userId }, {
 
 export function letterRoutes({ hub }) {
   const router = express.Router({ mergeParams: true });
+  router.use((req, _res, next) => {
+    assertDirect(req.ctx, 'Letters are for one-to-one chats');
+    next();
+  });
 
   const load = async (ctx, letterId) => {
     const letter = await scoped(Letter, ctx).findOne({

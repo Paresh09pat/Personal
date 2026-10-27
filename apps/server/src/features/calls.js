@@ -1,7 +1,7 @@
 import express from 'express';
 import { EVENTS, startCallSchema } from '@olw/shared';
-import { CallRecord } from '../models/index.js';
-import { assertWritable, partnerId, scoped } from '../authz/relationship.js';
+import { CallRecord, Relationship } from '../models/index.js';
+import { assertDirect, assertWritable, partnerId, scoped } from '../authz/relationship.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { signToken, verifyToken } from '../lib/crypto.js';
 import { parse, sameId } from '../lib/validate.js';
@@ -46,16 +46,38 @@ export async function finishCall(call, status, userId, hub) {
   call.endedAt = new Date();
   call.endedBy = userId;
   await call.save();
-  hub.toCall(call._id, EVENTS.CALL_ENDED, { callId: String(call._id), status: call.status });
-  hub.toRelationship(call.relationshipId, EVENTS.CALL_ENDED, { callId: String(call._id), status: call.status });
+  const payload = { callId: String(call._id), status: call.status };
+  hub.toCall(call._id, EVENTS.CALL_ENDED, payload);
+  hub.toRelationship(call.relationshipId, EVENTS.CALL_ENDED, payload);
+  // Each participant's private channel too: a ringing banner must disappear even when that person
+  // is not looking at this chat (and so has not joined its room).
+  const rel = await Relationship.findOne({ _id: call.relationshipId }, { participants: 1 });
+  for (const p of rel?.participants ?? []) {
+    hub.toUser(p.userId, EVENTS.CALL_ENDED, { ...payload, relationshipId: String(call.relationshipId) });
+  }
   return call;
 }
 
-/** Background job: calls nobody answered become "missed". */
+const ACTIVE_GRACE_MS = 30 * 1000;
+
+/**
+ * Cleans up calls nobody is on any more:
+ *  - ringing for over a minute -> "missed"
+ *  - "active" but with nobody left in the call room (tab closed, crash, lost connection) -> ended
+ * Without this a dead call blocks every new call with "already in progress".
+ */
 export async function expireRingingCalls(hub) {
-  const stale = await CallRecord.find({ status: 'ringing', createdAt: { $lt: new Date(Date.now() - RING_TIMEOUT_MS) } });
-  for (const call of stale) await finishCall(call, 'missed', null, hub);
-  return stale.length;
+  const ringing = await CallRecord.find({ status: 'ringing', createdAt: { $lt: new Date(Date.now() - RING_TIMEOUT_MS) } });
+  for (const call of ringing) await finishCall(call, 'missed', null, hub);
+  const active = await CallRecord.find({ status: 'active', startedAt: { $lt: new Date(Date.now() - ACTIVE_GRACE_MS) } });
+  let abandoned = 0;
+  for (const call of active) {
+    if ((await hub.callOccupancy(call._id)) === 0) {
+      await finishCall(call, 'ended', null, hub);
+      abandoned += 1;
+    }
+  }
+  return ringing.length + abandoned;
 }
 
 export function callRoutes({ config, hub }) {
@@ -73,13 +95,23 @@ export function callRoutes({ config, hub }) {
   });
 
   router.post('/', async (req, res) => {
+    assertDirect(req.ctx, 'Calls are not available in group chats yet');
     assertWritable(req.ctx);
     const { kind } = parse(startCallSchema, req.body);
     const target = partnerId(req.ctx);
     if (!target) throw new HttpError(409, 'Your partner has not joined yet');
     await expireRingingCalls(hub);
     const live = await scoped(CallRecord, req.ctx).findOne({ status: { $in: LIVE } });
-    if (live) throw new HttpError(409, 'A call is already in progress', { code: 'call_busy', details: { callId: String(live._id) } });
+    if (live) {
+      // My own leftover (a failed attempt, closed tab, ...): replace it. Only my partner's live call blocks me.
+      if (sameId(live.callerId, req.ctx.userId)) await finishCall(live, 'ended', req.ctx.userId, hub);
+      else {
+        throw new HttpError(409, live.status === 'ringing' ? 'Your partner is calling you right now. Answer the incoming call.' : 'A call is already in progress', {
+          code: 'call_busy',
+          details: { callId: String(live._id) },
+        });
+      }
+    }
     const call = await scoped(CallRecord, req.ctx).create({ callerId: req.ctx.userId, kind });
     hub.toUser(target, EVENTS.CALL_INCOMING, {
       relationshipId: String(req.ctx.relationshipId),

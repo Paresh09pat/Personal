@@ -34,7 +34,7 @@ describe('invitations', () => {
     const { token } = await pendingSpace();
     const res = await makeClient(t).post('/api/invitations/preview', { token });
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body.invitation).sort()).toEqual(['emailRestricted', 'expiresAt', 'inviterName', 'spaceTitle']);
+    expect(Object.keys(res.body.invitation).sort()).toEqual(['emailRestricted', 'expiresAt', 'inviterName', 'kind', 'spaceTitle']);
   });
 
   it('requires sign-in to accept', async () => {
@@ -109,7 +109,7 @@ describe('invitations', () => {
     // Even bypassing the API, the schema refuses a third participant.
     const rel = await Relationship.findById(id);
     rel.participants.push({ userId: owner.id, role: 'partner' });
-    await expect(rel.save()).rejects.toThrow(/at most two/);
+    await expect(rel.save()).rejects.toThrow(/space is full/);
   });
 
   it('only the owner can invite, and only for their own space', async () => {

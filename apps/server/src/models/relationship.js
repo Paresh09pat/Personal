@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 import {
   INVITATION_STATUS,
-  MAX_ACTIVE_PARTICIPANTS,
+  MAX_DIRECT_PARTICIPANTS,
+  MAX_GROUP_PARTICIPANTS,
   PARTICIPANT_ROLE,
   PARTICIPANT_STATUS,
   RELATIONSHIP_STATUS,
+  SPACE_KIND,
 } from '@olw/shared';
 
 const { Schema, Types } = mongoose;
@@ -41,13 +43,18 @@ const relationshipSchema = new Schema(
       enum: Object.values(RELATIONSHIP_STATUS),
       default: RELATIONSHIP_STATUS.PENDING,
     },
+    /** 'direct' = the original two-person space. Documents written before groups existed have no kind. */
+    kind: { type: String, enum: Object.values(SPACE_KIND), default: SPACE_KIND.DIRECT },
     participants: {
       type: [participantSchema],
       validate: {
-        validator: (list) =>
-          list.filter((p) => p.status === PARTICIPANT_STATUS.ACTIVE).length <= MAX_ACTIVE_PARTICIPANTS &&
-          list.length <= MAX_ACTIVE_PARTICIPANTS,
-        message: 'A relationship space has at most two participants',
+        // Not an arrow function: `this` is the space, so the cap depends on its kind.
+        validator(list) {
+          const active = list.filter((p) => p.status === PARTICIPANT_STATUS.ACTIVE).length;
+          if (this.kind === SPACE_KIND.GROUP) return active <= MAX_GROUP_PARTICIPANTS;
+          return active <= MAX_DIRECT_PARTICIPANTS && list.length <= MAX_DIRECT_PARTICIPANTS;
+        },
+        message: 'This space is full',
       },
     },
     createdBy: { type: Types.ObjectId, ref: 'User', required: true },
@@ -59,6 +66,13 @@ const relationshipSchema = new Schema(
       timezone: { type: String, default: '' },
       showTyping: { type: Boolean, default: true },
       showReadReceipts: { type: Boolean, default: true },
+      /** Chat look, shared by both people. */
+      theme: { type: String, default: 'classic' },
+      themeAnimated: { type: Boolean, default: true },
+      wallpaperAttachmentId: { type: Types.ObjectId, default: null },
+      wallpaperDim: { type: Number, default: 25 },
+      /** New messages vanish this many seconds after being sent. 0 = off. */
+      disappearAfterSec: { type: Number, default: 0 },
     },
     /** Sorted "userA:userB" while active/archived; unset when ended so the pair can start over. */
     pairKey: { type: String, default: undefined },
@@ -85,6 +99,10 @@ const invitationSchema = new Schema(
     inviterId: { type: Types.ObjectId, ref: 'User', required: true },
     tokenHash: { type: String, required: true },
     inviteeEmail: { type: String, lowercase: true, trim: true, default: null },
+    /** Direct invitations are single-use; group links can be used by several people until they expire. */
+    kind: { type: String, enum: Object.values(SPACE_KIND), default: SPACE_KIND.DIRECT },
+    maxUses: { type: Number, default: 0 },
+    usesCount: { type: Number, default: 0 },
     status: {
       type: String,
       enum: Object.values(INVITATION_STATUS),

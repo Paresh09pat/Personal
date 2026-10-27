@@ -3,7 +3,11 @@ import {
   ALLOWED_MIME,
   ATTACHMENT_PURPOSES,
   LIMITS,
+  CHAT_THEMES,
+  DISAPPEAR,
+  MAX_GROUP_PARTICIPANTS,
   REACTIONS,
+  SPACE_KIND,
   SURPRISE_STATUS,
 } from './constants.js';
 
@@ -62,10 +66,18 @@ export const confirmDestructiveSchema = z.object({
 });
 
 // ── Relationships ────────────────────────────────────────────────────────
-export const createRelationshipSchema = z.object({
-  title: trimmed(LIMITS.title).optional(),
-  myDisplayName: trimmed(LIMITS.displayName).optional(),
-});
+export const createRelationshipSchema = z
+  .object({
+    kind: z.enum(Object.values(SPACE_KIND)).default(SPACE_KIND.DIRECT),
+    title: trimmed(LIMITS.title).optional(),
+    myDisplayName: trimmed(LIMITS.displayName).optional(),
+  })
+  .refine((v) => v.kind !== SPACE_KIND.GROUP || Boolean(v.title), {
+    message: 'Give your group a name',
+    path: ['title'],
+  });
+
+export const setMemberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 
 export const updateRelationshipSchema = z.object({
   title: trimmed(LIMITS.title).optional(),
@@ -77,6 +89,15 @@ export const updateRelationshipSchema = z.object({
       timezone: trimmed(64).optional(),
       showTyping: z.boolean().optional(),
       showReadReceipts: z.boolean().optional(),
+      theme: z.enum(CHAT_THEMES).optional(),
+      themeAnimated: z.boolean().optional(),
+      wallpaperAttachmentId: objectId.nullable().optional(),
+      wallpaperDim: z.number().int().min(0).max(70).optional(),
+      disappearAfterSec: z
+        .number()
+        .int()
+        .refine((n) => n === 0 || (n >= DISAPPEAR.minSec && n <= DISAPPEAR.maxSec), 'Pick a time between 1 minute and 30 days')
+        .optional(),
     })
     .optional(),
 });
@@ -97,6 +118,8 @@ export const updateMyParticipantSchema = z.object({
 export const createInvitationSchema = z.object({
   inviteeEmail: emailSchema.optional(),
   expiresInHours: z.number().int().min(1).max(24 * 14).optional(),
+  /** Group links only: stop working after this many people joined (omit for no limit). */
+  maxUses: z.number().int().min(1).max(MAX_GROUP_PARTICIPANTS).optional(),
 });
 
 // ── Messages ─────────────────────────────────────────────────────────────

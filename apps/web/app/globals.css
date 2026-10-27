@@ -134,3 +134,44 @@ body {
     animation: none;
   }
 }
+
+/* ── Chat bubbles (a theme can override the --bubble-* variables) ───────── */
+.bubble-me {
+  background: var(--bubble-me, var(--accent));
+  color: var(--bubble-me-ink, var(--accent-ink));
+}
+.bubble-them {
+  background: var(--bubble-them-bg, var(--bubble-them));
+  color: var(--bubble-them-ink, var(--ink));
+}
+
+/* ── Interactive affordances, everywhere ────────────────────────────────── */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  a[href],
+  summary,
+  select:not(:disabled),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='range']:not(:disabled),
+  input[type='file'],
+  input[type='submit']:not(:disabled),
+  label:has(> input[type='file']),
+  label:has(> input[type='checkbox']:not(:disabled)),
+  label:has(> input[type='radio']:not(:disabled)) {
+    cursor: pointer;
+  }
+  button:disabled,
+  input:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Button labels read "Apply For Both Of Us". Stays out of the way of emoji-only and icon buttons. */
+  button,
+  input[type='submit'],
+  input[type='button'] {
+    text-transform: capitalize;
+  }
+}

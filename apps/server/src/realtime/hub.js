@@ -28,6 +28,12 @@ export class RealtimeHub {
     this.io?.to(callRoom(callId)).emit(event, payload);
   }
 
+  /** How many sockets are currently inside a call's room (0 when nobody is really on the call). */
+  async callOccupancy(callId) {
+    if (!this.io) return 0;
+    return (await this.io.in(callRoom(callId)).fetchSockets()).length;
+  }
+
   /** Remove sockets from a space's live rooms (end, delete, account deletion). */
   async evictFromRelationship(relationshipId, { userIds, callIds = [] } = {}) {
     if (!this.io) return;
