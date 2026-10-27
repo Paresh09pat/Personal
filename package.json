@@ -20,6 +20,7 @@
     "test": "npm run test -w @olw/server && npm run test -w @olw/web",
     "test:isolation": "npm run test:isolation -w @olw/server",
     "migrate:legacy": "npm run migrate:legacy -w @olw/server --",
+    "copy-local-media": "npm run copy-local-media -w @olw/server --",
     "create-admin": "npm run create-admin -w @olw/server --",
     "format": "prettier --write ."
   },

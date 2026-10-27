@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:isolation": "vitest run test/isolation.test.js",
     "migrate:legacy": "node src/scripts/migrate-legacy.js",
+    "copy-local-media": "node src/scripts/copy-local-media.js",
     "create-admin": "node src/scripts/create-admin.js"
   },
   "dependencies": {

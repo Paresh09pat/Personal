@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Heart, Loader2, X } from 'lucide-react';
 import { initials } from '@/lib/format';
 
@@ -72,11 +72,19 @@ export function Card({ className, children, ...props }) {
 }
 
 export function Avatar({ name, src, size = 40, online, className }) {
+  // A photo that cannot be loaded (missing file, expired session) falls back to initials instead of a broken image.
+  const [failedSrc, setFailedSrc] = useState(null);
+  const showPhoto = Boolean(src) && failedSrc !== src;
   return (
     <span className={cx('relative inline-flex shrink-0', className)} style={{ width: size, height: size }}>
-      {src ? (
+      {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element -- private, auth-checked media
-        <img src={src} alt={name ?? ''} className="h-full w-full rounded-full object-cover ring-2 ring-surface-solid" />
+        <img
+          src={src}
+          alt={name ?? ''}
+          onError={() => setFailedSrc(src)}
+          className="h-full w-full rounded-full object-cover ring-2 ring-surface-solid"
+        />
       ) : (
         <span
           className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-accent to-gold font-display font-semibold text-white ring-2 ring-surface-solid"

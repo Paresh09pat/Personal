@@ -92,3 +92,14 @@ The migration is idempotent and never deletes anything. **Back up the database f
 - Run a single instance (see SECURITY.md for scaling out with Redis).
 - Watch `/healthz`.
 - Rotate `SESSION_SECRET` only if you need to sign everyone out.
+
+## Running locally against the same database as the hosted site
+
+If your local copy and the hosted copy share one MongoDB (`MONGODB_URI`), they must also share **where photos are stored**, otherwise a photo uploaded from one side shows as a broken image on the other. Set `STORAGE_DRIVER=mongo` in your local `.env` too (the hosted free plan already uses it).
+
+Photos that were uploaded locally *before* you did that live only on your disk. Copy them into the database once:
+
+```sh
+npm run copy-local-media            # dry run: lists what would be copied
+npm run copy-local-media -- --apply # copies (safe to repeat, never deletes anything)
+```

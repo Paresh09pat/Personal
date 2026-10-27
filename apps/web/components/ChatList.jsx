@@ -114,6 +114,8 @@ export function ChatList({ createOpen, onCreateOpenChange }) {
   const isAdmin = Boolean(me?.user?.isAdmin);
   const canCreate = isAdmin || authConfig?.spaceCreation === 'everyone';
   const user = me?.user;
+  // Your own photo: the one you set in the chat that is open, else any chat where you set one.
+  const myAvatar = ((spaces ?? []).find((s) => s.id === rid) ?? (spaces ?? []).find((s) => s.me?.avatarUrl))?.me?.avatarUrl;
 
   const q = query.trim().toLowerCase();
   const visible = (spaces ?? []).filter((s) => !q || spaceName(s).toLowerCase().includes(q) || s.title?.toLowerCase().includes(q));
@@ -125,7 +127,7 @@ export function ChatList({ createOpen, onCreateOpenChange }) {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 px-4 pb-2 pt-4">
         <Link href="/account" aria-label="Your account">
-          <Avatar name={user?.displayName} size={40} />
+          <Avatar name={user?.displayName} src={myAvatar} size={40} />
         </Link>
         <h1 className="flex-1 font-display text-3xl font-semibold">Chats</h1>
         {canCreate && (
